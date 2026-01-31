@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="tts_stellaris.vcxproj" Id="08c02640-fa41-46e9-857d-9109bbe32b88" />
+</Solution>

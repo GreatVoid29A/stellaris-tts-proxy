@@ -1,0 +1,9 @@
+x64/*
+libMinHook.x64.lib
+libMinHook.x86.lib
+libMinHook*.zip
+MinHook_*
+MinHook.h
+tts_stellaris/*
+libMinHooklib
+.vs/*

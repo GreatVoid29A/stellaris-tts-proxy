@@ -1,0 +1,84 @@
+name: Build and Release
+
+on:
+  release:
+    types: [created]
+
+env:
+  BUILD_CONFIGURATION: Release
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download MinHook
+        run: |
+          $releaseUrl = "https://github.com/TsudaKageyu/minhook/releases/download/v1.3.4/MinHook_134_lib.zip"
+          $outputPath = "MinHook.zip"
+          Write-Host "Downloading MinHook from $releaseUrl"
+          Invoke-WebRequest -Uri $releaseUrl -OutFile $outputPath
+
+          Write-Host "Extracting MinHook.zip..."
+          Expand-Archive -Path $outputPath -DestinationPath MinHook -Force
+
+          Write-Host "Contents of extracted directory:"
+          Get-ChildItem -Recurse MinHook | Select-Object FullName
+
+          # Find and copy the lib file (handle variable paths)
+          $libFile = Get-ChildItem -Recurse MinHook -Filter "libMinHook.x64.lib" | Select-Object -First 1
+          if ($libFile) {
+            Write-Host "Found lib at: $($libFile.FullName)"
+            Copy-Item $libFile.FullName -Destination .
+          } else {
+            Write-Error "libMinHook.x64.lib not found in MinHook package"
+            exit 1
+          }
+
+          # Find and copy the header
+          $headerFile = Get-ChildItem -Recurse MinHook -Filter "MinHook.h" | Select-Object -First 1
+          if ($headerFile) {
+            Write-Host "Found header at: $($headerFile.FullName)"
+            Copy-Item $headerFile.FullName -Destination .
+          } else {
+            Write-Error "MinHook.h not found in MinHook package"
+            exit 1
+          }
+        shell: pwsh
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build DLL
+        run: msbuild tts_stellaris.vcxproj /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /v:minimal
+
+      - name: Copy DLL to root directory
+        run: Copy-Item x64/Release/version.dll -Destination version.dll
+        shell: pwsh
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        with:
+          name: version-dll-${{ github.sha }}
+          path: |
+            version.dll
+            tts_settings.txt
+          retention-days: 7
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: |
+            version.dll
+            tts_settings.txt
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
